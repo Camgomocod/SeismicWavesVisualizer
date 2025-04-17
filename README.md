@@ -43,13 +43,13 @@ This project is a PyQt5 application designed to visualize seismic wave data. It 
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
+   git clone <git@github.com:Camgomocod/SeismicWavesVisualizer.git>
    cd seismic-wave-visualizer
    ```
 
 2. Install the required dependencies:
    ```
-   pip install -r requirements.txt
+   pip install -r requirements.txt 
    ```
 
 ## Usage

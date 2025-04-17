@@ -31,7 +31,6 @@ class LabelValidator:
         
         relative_p_time = self.p_arrival_time - self.start_time
         
-        # Check if P arrival is within signal duration
         is_valid = 0 <= relative_p_time <= self.duration
         
         return {
