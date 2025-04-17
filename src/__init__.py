@@ -1,0 +1,3 @@
+"""
+Seismic Wave Visualizer package
+"""

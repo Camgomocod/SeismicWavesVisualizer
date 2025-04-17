@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: seismic-wave-visualizer
+Version: 0.1
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib
+Requires-Dist: PyQt5
+Requires-Dist: obspy
+Requires-Dist: pandas
+Requires-Dist: pyqtgraph

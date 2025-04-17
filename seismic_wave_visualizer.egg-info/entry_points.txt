@@ -1,0 +1,2 @@
+[console_scripts]
+seismic-visualizer = src.main:main
