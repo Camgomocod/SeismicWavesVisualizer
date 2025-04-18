@@ -45,11 +45,24 @@ class ValidationWindow(QMainWindow):
         self.analyze_button.clicked.connect(self.start_analysis)
         header_layout.addWidget(self.analyze_button)
         
-        # Add export button
-        self.export_button = QPushButton("Export Results")
-        self.export_button.clicked.connect(self.export_results)
-        self.export_button.setEnabled(False)
-        header_layout.addWidget(self.export_button)
+        # Add export buttons layout
+        export_layout = QHBoxLayout()
+        
+        # Add export all button
+        self.export_all_button = QPushButton("Export All Results")
+        self.export_all_button.setToolTip("Export all validation results to CSV")
+        self.export_all_button.clicked.connect(lambda: self.export_results(only_invalid=False))
+        self.export_all_button.setEnabled(False)
+        export_layout.addWidget(self.export_all_button)
+        
+        # Add export invalid button
+        self.export_invalid_button = QPushButton("Export Invalid Only")
+        self.export_invalid_button.setToolTip("Export only invalid P arrival times to CSV")
+        self.export_invalid_button.clicked.connect(lambda: self.export_results(only_invalid=True))
+        self.export_invalid_button.setEnabled(False)
+        export_layout.addWidget(self.export_invalid_button)
+        
+        header_layout.addLayout(export_layout)
         
         layout.addLayout(header_layout)
         
@@ -115,7 +128,8 @@ class ValidationWindow(QMainWindow):
         """Start the analysis process"""
         self.status_label.setText("Analyzing files...")
         self.analyze_button.setEnabled(False)
-        self.export_button.setEnabled(False)
+        self.export_all_button.setEnabled(False)
+        self.export_invalid_button.setEnabled(False)
         self.table.setRowCount(0)
         self.summary_label.clear()
         self.validation_results = []
@@ -200,7 +214,8 @@ class ValidationWindow(QMainWindow):
         self.progress_timer.stop()
         self.progress_bar.hide()
         self.analyze_button.setEnabled(True)
-        self.export_button.setEnabled(True)
+        self.export_all_button.setEnabled(True)
+        self.export_invalid_button.setEnabled(True)
         self.status_label.setText("Analysis complete")
         
         # Update summary
@@ -210,7 +225,7 @@ class ValidationWindow(QMainWindow):
             f"({invalid_count/self.total_files*100:.1f}%)"
         )
     
-    def export_results(self):
+    def export_results(self, only_invalid=False):
         """Export validation results to CSV"""
         if not self.validation_results:
             return
@@ -219,7 +234,8 @@ class ValidationWindow(QMainWindow):
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Validation Results",
-            os.path.join(os.path.expanduser("~"), "validation_results.csv"),
+            os.path.join(os.path.expanduser("~"), 
+                        "validation_results_invalid.csv" if only_invalid else "validation_results_all.csv"),
             "CSV Files (*.csv)"
         )
         
@@ -230,13 +246,18 @@ class ValidationWindow(QMainWindow):
             # Create DataFrame from results
             data = []
             for result in self.validation_results:
+                # Si only_invalid es True, solo incluir resultados inválidos
+                if only_invalid and result['is_valid']:
+                    continue
+                    
                 details = result['details']
                 data.append({
                     'File ID': details['file_id'],
                     'Is Valid': result['is_valid'],
                     'Signal Duration (s)': details['duration'],
                     'P Arrival Time (s)': details['relative_p_time'] if details['p_arrival'] else None,
-                    'Error': result['error'] if not result['is_valid'] else None
+                    'Error': result['error'] if not result['is_valid'] else None,
+                    'Has P Arrival': details.get('has_p_arrival', False)
                 })
             
             df = pd.DataFrame(data)

@@ -55,7 +55,7 @@ class DataLoader:
     def load_csv_if_train_dir(self):
         """Load CSV file only if we're in a train directory"""
         if 'train' in self.data_dir.lower():
-            csv_path = '/mnt/c/Users/Usuario/Documents/Studies/GicoProject/SismicWaves/data/raw/VT_P_training.csv'
+            csv_path = '/mnt/c/Users/Usuario/Documents/Studies/GicoProject/SeismicWaves/data/raw/VT_P_training.csv'
             try:
                 self.df = pd.read_csv(csv_path)
                 # Convert 'lec_p' column to numeric, setting invalid values to NaN
