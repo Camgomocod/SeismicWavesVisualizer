@@ -5,3 +5,5 @@ PyQt5
 obspy
 pandas
 pyqtgraph
+tensorflow
+PyWavelets

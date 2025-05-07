@@ -307,14 +307,14 @@ class PlotWidget(QWidget):
         self.spec_plot.setYRange(0, f[-1])
 
     def plot_data(self, times, original_data, filtered_data=None, p_arrival_time=None, file_id=None):
-        """Plot original and filtered seismic data"""
+        """Plot original and filtered seismic data with P arrival markers"""
         # Store the last plot data for view toggling
         self._last_plot_data = {
             'times': times,
             'original_data': original_data,
             'filtered_data': filtered_data,
             'p_arrival_time': p_arrival_time,
-            'file_id': file_id  # Almacenamos también el ID del archivo
+            'file_id': file_id
         }
         
         # Calculate and update metrics
@@ -337,23 +337,26 @@ class PlotWidget(QWidget):
             self.separate_plots[0].plot(times, original_data, pen='b', name='Original')
             self.separate_plots[1].plot(times, filtered_data, pen='orange', name='Filtered')
             
-            # Add P arrival markers if available
+            # Add real P arrival markers if available
             if p_arrival_time is not None:
                 for plot in self.separate_plots:
-                    p_line = pg.InfiniteLine(pos=p_arrival_time, angle=90, pen='r', label='P arrival')
+                    p_line = pg.InfiniteLine(pos=p_arrival_time, angle=90, 
+                                           pen=pg.mkPen('r', width=2), label='P arrival')
                     plot.addItem(p_line)
                     text = pg.TextItem("P arrival", color='r', anchor=(0.5, 1.0))
                     text.setPos(p_arrival_time, plot.getViewBox().viewRange()[1][1])
                     plot.addItem(text)
+            
         else:
             # Plot in combined view
             self.combined_plot.plot(times, original_data, pen='b', name='Original')
             if filtered_data is not None:
                 self.combined_plot.plot(times, filtered_data, pen='orange', name='Filtered')
             
-            # Add P arrival marker if available
+            # Add real P arrival marker if available
             if p_arrival_time is not None:
-                p_line = pg.InfiniteLine(pos=p_arrival_time, angle=90, pen='r', label='P arrival')
+                p_line = pg.InfiniteLine(pos=p_arrival_time, angle=90,
+                                       pen=pg.mkPen('r', width=2), label='P arrival')
                 self.combined_plot.addItem(p_line)
                 text = pg.TextItem("P arrival", color='r', anchor=(0.5, 1.0))
                 text.setPos(p_arrival_time, self.combined_plot.getViewBox().viewRange()[1][1])

@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                           QPushButton, QTableWidget, QTableWidgetItem, QLabel,
-                          QHeaderView, QProgressBar, QFileDialog)
+                          QHeaderView, QProgressBar, QFileDialog, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor
 from src.data.data_loader import DataLoader
@@ -8,7 +8,7 @@ import os
 import pandas as pd
 
 class ValidationWindow(QMainWindow):
-    def __init__(self, csv_path, data_dir=None):
+    def __init__(self, csv_path=None, data_dir=None):
         super().__init__()
         self.setWindowTitle("Label Validation Analysis")
         self.resize(800, 600)
@@ -20,6 +20,22 @@ class ValidationWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
+        
+        # Add CSV file controls
+        csv_controls = QHBoxLayout()
+        self.csv_label = QLabel("P-wave Times CSV:")
+        self.csv_path_label = QLabel(self.data_loader.csv_path or "No file selected")
+        self.csv_path_label.setStyleSheet("color: gray;")
+        self.select_csv_button = QPushButton("Select CSV")
+        self.select_csv_button.setToolTip("Select CSV file with P-wave arrival times")
+        self.select_csv_button.clicked.connect(self.select_csv_file)
+        
+        csv_controls.addWidget(self.csv_label)
+        csv_controls.addWidget(self.csv_path_label)
+        csv_controls.addWidget(self.select_csv_button)
+        csv_controls.addStretch()
+        
+        layout.addLayout(csv_controls)
         
         # Add data directory controls
         data_controls = QHBoxLayout()
@@ -124,8 +140,39 @@ class ValidationWindow(QMainWindow):
         if directory:
             self.update_data_directory(directory)
     
+    def select_csv_file(self):
+        """Open file selection dialog for CSV"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select P-wave Times CSV File",
+            os.path.expanduser("~"),
+            "CSV Files (*.csv)"
+        )
+        
+        if file_path:
+            success, message = self.data_loader.load_csv(file_path)
+            if success:
+                self.csv_path_label.setText(file_path)
+                self.csv_path_label.setStyleSheet("color: green;")
+                self.status_label.setText("CSV file loaded successfully")
+                
+                # Start new analysis automatically
+                self.start_analysis()
+            else:
+                self.csv_path_label.setText("Error loading CSV")
+                self.csv_path_label.setStyleSheet("color: red;")
+                self.status_label.setText(message)
+
     def start_analysis(self):
         """Start the analysis process"""
+        if self.data_loader.df is None or len(self.data_loader.df) == 0:
+            QMessageBox.warning(
+                self,
+                "No Data",
+                "Please select a CSV file with P-wave arrival times before starting analysis."
+            )
+            return
+            
         self.status_label.setText("Analyzing files...")
         self.analyze_button.setEnabled(False)
         self.export_all_button.setEnabled(False)

@@ -1,20 +1,29 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QComboBox, QPushButton, QLabel,
                              QSpinBox, QDoubleSpinBox, QFileDialog, QLineEdit, QShortcut)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QStandardPaths
 from PyQt5.QtGui import QKeySequence
+import os
+
+# Configure fallback for QStandardPaths
+try:
+    runtime_dir = QStandardPaths.writableLocation(QStandardPaths.RuntimeLocation)
+    if not os.path.exists(runtime_dir):
+        os.makedirs(runtime_dir, exist_ok=True)
+except Exception:
+    # Fallback to temp directory if runtime dir is not accessible
+    os.environ['XDG_RUNTIME_DIR'] = '/tmp'
+
 from src.ui.plot_widget import PlotWidget
 from src.data.data_loader import DataLoader
 from src.filters.butterworth import bandpass_filter
 from src.ui.validation_window import ValidationWindow
-import os
 import json
-import pandas as pd  # Añadido para manejo de timestamps
+import pandas as pd
 
 class MainWindow(QMainWindow):
-    def __init__(self, csv_path):
+    def __init__(self, csv_path=None):
         super().__init__()
-        self.csv_path = csv_path
         self.setWindowTitle("Seismic Wave Visualizer")
         self.resize(1200, 800)
         
@@ -25,6 +34,22 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
+        
+        # Create CSV file controls
+        csv_controls = QHBoxLayout()
+        self.csv_label = QLabel("P-wave Times CSV:")
+        self.csv_path_label = QLabel(self.data_loader.csv_path or "No file selected")
+        self.csv_path_label.setStyleSheet("color: gray;")
+        self.select_csv_button = QPushButton("Select CSV")
+        self.select_csv_button.setToolTip("Select CSV file with P-wave arrival times")
+        self.select_csv_button.clicked.connect(self.select_csv_file)
+        
+        csv_controls.addWidget(self.csv_label)
+        csv_controls.addWidget(self.csv_path_label)
+        csv_controls.addWidget(self.select_csv_button)
+        csv_controls.addStretch()
+        
+        layout.addLayout(csv_controls)
         
         # Create data directory controls with tooltips
         data_controls = QHBoxLayout()
@@ -238,20 +263,29 @@ class MainWindow(QMainWindow):
                 if p_arrival:
                     p_time = p_arrival - self.current_data['start_time']
                 
-                # Validate labels (will handle missing P arrival gracefully)
+                # Validate labels
                 validation_result = self.data_loader.validate_labels(file_id, self.current_data)
                 self.plot_widget.set_validation_result(validation_result)
                 
-                # Display data and apply filter if active
+                # Display data
                 if self.filter_active:
-                    self.apply_filter()
-                else:
-                    self.plot_widget.plot_data(
-                        self.current_data['times'],
+                    filtered_data = bandpass_filter(
                         self.current_data['data_normalized'],
-                        p_arrival_time=p_time,
-                        file_id=file_id  # Añadimos el ID del archivo
+                        self.current_data['sampling_rate'],
+                        lowcut=self.low_cut.value(),
+                        highcut=self.high_cut.value(),
+                        order=self.filter_order.value()
                     )
+                else:
+                    filtered_data = None
+                
+                self.plot_widget.plot_data(
+                    self.current_data['times'],
+                    self.current_data['data_normalized'],
+                    filtered_data,
+                    p_arrival_time=p_time,
+                    file_id=file_id
+                )
                 
                 self.statusBar().showMessage(f"Loaded file {file_id}", 3000)
                 
@@ -297,7 +331,7 @@ class MainWindow(QMainWindow):
                 self.current_data['data_normalized'],
                 filtered_data,
                 p_arrival_time=p_time,
-                file_id=self.current_file_id  # Añadimos el ID del archivo
+                file_id=self.current_file_id
             )
             
             # Mark filter as active
@@ -431,3 +465,27 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Notice: Using default filter values - {str(e)}")
             # Use default values if loading fails
+    
+    def select_csv_file(self):
+        """Open file selection dialog for CSV"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select P-wave Times CSV File",
+            os.path.expanduser("~"),
+            "CSV Files (*.csv)"
+        )
+        
+        if file_path:
+            success, message = self.data_loader.load_csv(file_path)
+            if success:
+                self.csv_path_label.setText(file_path)
+                self.csv_path_label.setStyleSheet("color: green;")
+                self.statusBar().showMessage("CSV file loaded successfully", 3000)
+                
+                # Reload current file if one is loaded
+                if self.current_file_id is not None:
+                    self.load_file(self.current_file_id)
+            else:
+                self.csv_path_label.setText("Error loading CSV")
+                self.csv_path_label.setStyleSheet("color: red;")
+                self.statusBar().showMessage(message, 5000)

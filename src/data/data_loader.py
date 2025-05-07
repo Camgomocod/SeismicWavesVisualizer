@@ -49,51 +49,69 @@ class DataLoader:
     def __init__(self, csv_path=None, data_dir=None):
         """Initialize the data loader with optional CSV path and data directory"""
         self.data_dir = data_dir or os.getcwd()
+        self.csv_path = csv_path
         self.df = None
-        self.load_csv_if_train_dir()
+        self.load_csv()
     
-    def load_csv_if_train_dir(self):
-        """Load CSV file only if we're in a train directory"""
-        if 'train' in self.data_dir.lower():
-            csv_path = '/mnt/c/Users/Usuario/Documents/Studies/GicoProject/SeismicWaves/data/raw/VT_P_training.csv'
+    def load_csv(self, csv_path=None):
+        """Load CSV file with P-wave arrival times"""
+        if csv_path:
+            self.csv_path = csv_path
+            
+        if self.csv_path and os.path.exists(self.csv_path):
             try:
-                self.df = pd.read_csv(csv_path)
+                self.df = pd.read_csv(self.csv_path)
                 # Convert 'lec_p' column to numeric, setting invalid values to NaN
                 self.df['lec_p'] = pd.to_numeric(self.df['lec_p'], errors='coerce')
-                print("Loaded P-wave arrival times for train data")
+                return True, "CSV loaded successfully"
             except Exception as e:
-                print(f"Warning: Error reading CSV file - {e}")
                 self.df = pd.DataFrame(columns=['archivo', 'lec_p'])
+                return False, f"Error reading CSV file: {str(e)}"
         else:
-            # Create empty DataFrame if not in train directory
             self.df = pd.DataFrame(columns=['archivo', 'lec_p'])
-    
+            return False, "No CSV file specified or file not found"
+
     def set_data_directory(self, directory):
         """Set the directory where MSEED files are located"""
         self.data_dir = directory
-        # Reload CSV if needed based on new directory
-        self.load_csv_if_train_dir()
     
     def get_mseed_path(self, file_id):
         """Get full path for a MSEED file"""
-        # First try without leading zero
+        matching_files = []
+        
+        # Search in directory and subdirectories
+        for root, dirs, files in os.walk(self.data_dir):
+            for file in files:
+                if not file.endswith('.mseed'):
+                    continue
+                    
+                # Extract base name without extension
+                base_name = file.replace('.mseed', '')
+                
+                # Handle augmented files
+                if '_aug' in base_name:
+                    base_name = base_name.split('_aug')[0]
+                
+                # Try to match the ID (with or without leading zero)
+                try:
+                    current_id = int(base_name.lstrip('0'))
+                    if current_id == int(file_id):
+                        matching_files.append(os.path.join(root, file))
+                except ValueError:
+                    continue
+        
+        # If we found matches, return the first one
+        # (You might want to implement a different selection strategy)
+        if matching_files:
+            return matching_files[0]
+            
+        # If no matches found, try the old way for backward compatibility
         direct_path = os.path.join(self.data_dir, f"{file_id}.mseed")
         if os.path.exists(direct_path):
             return direct_path
             
-        # If not found, try with leading zero
         zero_path = os.path.join(self.data_dir, f"0{file_id}.mseed")
-        if os.path.exists(zero_path):
-            return zero_path
-            
-        # Try searching in subdirectories
-        for root, dirs, files in os.walk(self.data_dir):
-            for file in files:
-                if file == f"{file_id}.mseed" or file == f"0{file_id}.mseed":
-                    return os.path.join(root, file)
-                    
-        # Return the zero-prefixed path as default (for backward compatibility)
-        return zero_path
+        return zero_path  # Return this path even if it doesn't exist (backward compatibility)
     
     def load_mseed(self, file_name):
         """
@@ -228,11 +246,18 @@ class DataLoader:
                 for file in files:
                     if file.endswith('.mseed'):
                         try:
-                            # Extract file ID from filename, handling both formats:
-                            # - With leading 0 (04010355.mseed)
-                            # - Without leading 0 (4010626.mseed)
-                            file_id = int(file.replace('.mseed', ''))
-                            mseed_files.append(file_id)
+                            # Extract base filename without extension
+                            base_name = file.replace('.mseed', '')
+                            
+                            # Handle augmented files (with _aug suffix)
+                            if '_aug' in base_name:
+                                # Extract the ID part before _aug
+                                base_name = base_name.split('_aug')[0]
+                            
+                            # Remove leading zeros and convert to integer
+                            file_id = int(base_name.lstrip('0'))
+                            if file_id not in mseed_files:
+                                mseed_files.append(file_id)
                         except ValueError:
                             print(f"Warning: Could not parse file ID from {file}")
                             continue
